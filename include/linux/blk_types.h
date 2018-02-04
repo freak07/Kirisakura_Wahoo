@@ -219,11 +219,11 @@ enum rq_flag_bits {
 	__REQ_FLUSH_SEQ,	/* request for flush sequence */
 	__REQ_IO_STAT,		/* account I/O stat */
 	__REQ_MIXED_MERGE,	/* merge of different types, fail separately */
+	__REQ_URGENT,    	/* urgent request */
 	__REQ_PM,		/* runtime pm request */
 	__REQ_HASHED,		/* on IO scheduler merge hash */
 	__REQ_MQ_INFLIGHT,	/* track inflight for MQ */
 	__REQ_NO_TIMEOUT,	/* requests may never expire */
-	__REQ_URGENT,		/* urgent request */
 	__REQ_NR_BITS,		/* stops here */
 };
 
@@ -256,7 +256,6 @@ enum rq_flag_bits {
 
 #define REQ_RAHEAD		(1ULL << __REQ_RAHEAD)
 #define REQ_THROTTLED		(1ULL << __REQ_THROTTLED)
-
 #define REQ_SORTED		(1ULL << __REQ_SORTED)
 #define REQ_SOFTBARRIER		(1ULL << __REQ_SOFTBARRIER)
 #define REQ_FUA			(1ULL << __REQ_FUA)
