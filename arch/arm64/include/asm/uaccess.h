@@ -113,15 +113,15 @@ static inline void set_fs(mm_segment_t fs)
  * This is equivalent to the following test:
  * (u65)addr + (u65)size <= (u65)current->addr_limit + 1
  */
-static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
+static inline unsigned long __range_ok(const void __user *addr, unsigned long size)
 {
-	unsigned long limit = current_thread_info()->addr_limit;
+	unsigned long ret, limit = current_thread_info()->addr_limit;
 
 	__chk_user_ptr(addr);
 	asm volatile(
 	// A + B <= C + 1 for all A,B,C, in four easy steps:
 	// 1: X = A + B; X' = X % 2^64
-	"	adds	%0, %0, %2\n"
+	"	adds	%0, %3, %2\n"
 	// 2: Set C = 0 if X > 2^64, to guarantee X' > C in step 4
 	"	csel	%1, xzr, %1, hi\n"
 	// 3: Set X' = ~0 if X >= 2^64. For X == 2^64, this decrements X'
@@ -133,9 +133,9 @@ static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
 	//    testing X' - C == 0, subject to the previous adjustments.
 	"	sbcs	xzr, %0, %1\n"
 	"	cset	%0, ls\n"
-	: "+r" (addr), "+r" (limit) : "Ir" (size) : "cc");
+	: "=&r" (ret), "+r" (limit) : "Ir" (size), "0" (addr) : "cc");
 
-	return addr;
+	return ret;
 }
 
 /*
@@ -143,9 +143,11 @@ static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
  * up with a tagged userland pointer. Clear the tag to get a sane pointer to
  * pass on to access_ok(), for instance.
  */
-#define untagged_addr(addr)		sign_extend64(addr, 55)
+#define untagged_addr(addr)		\
+	((__typeof__(addr))sign_extend64((__u64)(addr), 55))
 
-#define access_ok(type, addr, size)	__range_ok((unsigned long)(addr), size)
+#define access_ok(type, addr, size)	\
+	__range_ok(untagged_addr(addr), size)
 #define user_addr_max			get_fs
 
 #define _ASM_EXTABLE(from, to)						\
@@ -265,7 +267,8 @@ static inline void uaccess_enable_not_uao(void)
 
 /*
  * Sanitise a uaccess pointer such that it becomes NULL if above the
- * current addr_limit.
+ * current addr_limit. In case the pointer is tagged (has the top byte set),
+ * untag the pointer before checking.
  */
 #define uaccess_mask_ptr(ptr) (__typeof__(ptr))__uaccess_mask_ptr(ptr)
 static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
@@ -273,10 +276,11 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
 	void __user *safe_ptr;
 
 	asm volatile(
-	"	bics	xzr, %1, %2\n"
+	"	bics	xzr, %3, %2\n"
 	"	csel	%0, %1, xzr, eq\n"
 	: "=&r" (safe_ptr)
-	: "r" (ptr), "r" (current_thread_info()->addr_limit)
+	: "r" (ptr), "r" (current_thread_info()->addr_limit),
+	  "r" (untagged_addr(ptr))
 	: "cc");
 
 	csdb();
@@ -335,34 +339,29 @@ do {									\
 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
 } while (0)
 
-#define __get_user_check(x, ptr, err)					\
+#define __get_user(x, ptr)						\
 ({									\
-	__typeof__(*(ptr)) __user *__p = (ptr);				\
-	might_fault();							\
-	if (access_ok(VERIFY_READ, __p, sizeof(*__p))) {		\
-		__p = uaccess_mask_ptr(__p);				\
-		__get_user_err((x), __p, (err));			\
-	} else {							\
-		(x) = 0; (err) = -EFAULT;				\
-	}								\
+	int __gu_err = 0;						\
+	__get_user_err((x), (ptr), __gu_err);				\
+	__gu_err;							\
 })
 
 #define __get_user_error(x, ptr, err)					\
 ({									\
-	__get_user_check((x), (ptr), (err));				\
+	__get_user_err((x), (ptr), (err));				\
 	(void)0;							\
 })
 
 #define __get_user_unaligned __get_user
 
-#define __get_user(x, ptr)						\
+#define get_user(x, ptr)						\
 ({									\
-	int __gu_err = 0;						\
-	__get_user_check((x), (ptr), __gu_err);				\
-	__gu_err;							\
+	__typeof__(*(ptr)) __user *__p = (ptr);				\
+	might_fault();							\
+	access_ok(VERIFY_READ, __p, sizeof(*__p)) ?			\
+		__p = uaccess_mask_ptr(__p), __get_user((x), __p) :	\
+		((x) = 0, -EFAULT);					\
 })
-
-#define get_user	__get_user
 
 #define __put_user_asm(instr, alt_instr, reg, x, addr, err, feature)	\
 	asm volatile(							\
@@ -406,34 +405,29 @@ do {									\
 	uaccess_disable_not_uao();					\
 } while (0)
 
-#define __put_user_check(x, ptr, err)					\
+#define __put_user(x, ptr)						\
 ({									\
-	__typeof__(*(ptr)) __user *__p = (ptr);				\
-	might_fault();							\
-	if (access_ok(VERIFY_WRITE, __p, sizeof(*__p))) {		\
-		__p = uaccess_mask_ptr(__p);				\
-		__put_user_err((x), __p, (err));			\
-	} else	{							\
-		(err) = -EFAULT;					\
-	}								\
+	int __pu_err = 0;						\
+	__put_user_err((x), (ptr), __pu_err);				\
+	__pu_err;							\
 })
 
 #define __put_user_error(x, ptr, err)					\
 ({									\
-	__put_user_check((x), (ptr), (err));				\
+	__put_user_err((x), (ptr), (err));				\
 	(void)0;							\
 })
 
 #define __put_user_unaligned __put_user
 
-#define __put_user(x, ptr)						\
+#define put_user(x, ptr)						\
 ({									\
-	int __pu_err = 0;						\
-	__put_user_check((x), (ptr), __pu_err);				\
-	__pu_err;							\
+	__typeof__(*(ptr)) __user *__p = (ptr);				\
+	might_fault();							\
+	access_ok(VERIFY_WRITE, __p, sizeof(*__p)) ?			\
+		__p = uaccess_mask_ptr(__p), __put_user((x), __p) :	\
+		-EFAULT;						\
 })
-
-#define put_user	__put_user
 
 extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
 extern unsigned long __must_check __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
