@@ -1156,13 +1156,13 @@ lim_process_auth_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
 
+	auth_alg = *(uint16_t *) body_ptr;
+	pe_debug("auth_alg %d ", auth_alg);
+
 	if (frame_len < 2) {
 		pe_err("invalid frame len: %d", frame_len);
 		return;
 	}
-
-	auth_alg = *(uint16_t *) body_ptr;
-	pe_debug("auth_alg %d ", auth_alg);
 
 	/* Restore default failure timeout */
 	if (QDF_P2P_CLIENT_MODE == pe_session->pePersona &&
