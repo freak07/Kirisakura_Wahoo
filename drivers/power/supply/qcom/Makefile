@@ -8,3 +8,7 @@ obj-$(CONFIG_QPNP_SMB2)		+= battery.o qpnp-smb2.o smb-lib.o pmic-voter.o storm-w
 obj-$(CONFIG_SMB138X_CHARGER)	+= battery.o smb138x-charger.o smb-lib.o pmic-voter.o storm-watch.o
 obj-$(CONFIG_QPNP_QNOVO)	+= battery.o qpnp-qnovo.o
 obj-$(CONFIG_FORCE_FAST_CHARGE) += fastcharge.o
+
+ifeq ($(CONFIG_QPNP_FG_GEN3),y)
+CFLAGS_qpnp-fg-gen3.o += -Wno-sizeof-array-div
+endif
