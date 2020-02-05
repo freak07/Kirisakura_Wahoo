@@ -202,7 +202,7 @@ static int32_t msm_vfe40_init_qos_parms(struct vfe_device *vfe_dev,
 		pr_err("%s: NO D/S entries found\n", __func__);
 	} else {
 		ds_settings = kcalloc(ds_entries, sizeof(uint32_t),
-				      GFP_KERNEL);
+				GFP_KERNEL);
 		if (!ds_settings) {
 			pr_err("%s:%d No memory\n", __func__, __LINE__);
 			return -ENOMEM;
