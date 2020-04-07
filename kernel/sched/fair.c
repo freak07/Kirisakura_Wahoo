@@ -3351,6 +3351,7 @@ void sync_entity_load_avg(struct sched_entity *se)
 void remove_entity_load_avg(struct sched_entity *se)
 {
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
+	u64 last_update_time;
 
 	/*
 	 * tasks cannot exit without having gone through wake_up_new_task() ->
@@ -3362,7 +3363,9 @@ void remove_entity_load_avg(struct sched_entity *se)
 	 * calls this.
 	 */
 
-	sync_entity_load_avg(se);
+	last_update_time = cfs_rq_last_update_time(cfs_rq);
+
+	__update_load_avg(last_update_time, cpu_of(rq_of(cfs_rq)), &se->avg, 0, 0, NULL);
 	atomic_long_add(se->avg.load_avg, &cfs_rq->removed_load_avg);
 	atomic_long_add(se->avg.util_avg, &cfs_rq->removed_util_avg);
 }
