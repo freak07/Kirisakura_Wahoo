@@ -1405,10 +1405,11 @@ static int ethtool_get_stats(struct net_device *dev, void __user *useraddr)
 	stats.n_stats = n_stats;
 	if (n_stats) {
 	data = kmalloc_array(n_stats, sizeof(u64), GFP_USER);
-	if (!data)
+	if (!data) {
 		return -ENOMEM;
 
 		ops->get_ethtool_stats(dev, &stats, data);
+		}
 	} else {
 		data = NULL;
 	}

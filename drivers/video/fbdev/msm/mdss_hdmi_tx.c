@@ -38,6 +38,10 @@
 #include "mdss_hdmi_mhl.h"
 #include "mdss_hdmi_util.h"
 
+#ifdef CONFIG_FB_MSM_MDSS
+#pragma clang diagnostic ignored "-Wint-in-bool-context"
+#endif
+
 #define DRV_NAME "hdmi-tx"
 #define COMPATIBLE_NAME "qcom,hdmi-tx"
 

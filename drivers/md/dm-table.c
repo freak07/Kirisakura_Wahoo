@@ -1155,12 +1155,6 @@ void dm_table_event_callback(struct dm_table *t,
 
 void dm_table_event(struct dm_table *t)
 {
-	/*
-	 * You can no longer call dm_table_event() from interrupt
-	 * context, use a bottom half instead.
-	 */
-	BUG_ON(in_interrupt());
-
 	mutex_lock(&_event_lock);
 	if (t->event_fn)
 		t->event_fn(t->event_context);
@@ -1558,11 +1552,12 @@ void dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 	 * Those bios are passed to request-based dm at the resume time.
 	 */
 	smp_mb();
-	if (dm_table_request_based(t))
+	if (dm_table_request_based(t)) {
 		queue_flag_set_unlocked(QUEUE_FLAG_STACKABLE, q);
 		
 		/* io_pages is used for readahead */
 		q->backing_dev_info->io_pages = limits->max_sectors >> (PAGE_SHIFT - 9);
+		}
 }
 
 unsigned int dm_table_get_num_targets(struct dm_table *t)

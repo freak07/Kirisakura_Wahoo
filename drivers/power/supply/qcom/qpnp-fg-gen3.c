@@ -408,6 +408,8 @@ static bool fg_sram_dump;
 
 #define FG_RATE_LIM_MS (5 * MSEC_PER_SEC)
 
+static int fg_get_battery_current(struct fg_chip *chip, int *val);
+
 /* All getters HERE */
 
 #define VOLTAGE_15BIT_MASK	GENMASK(14, 0)
@@ -634,15 +636,12 @@ static int comp_temp_by_chg_current(struct fg_chip *chip, int fg_temp,
 	if (pval.intval == POWER_SUPPLY_STATUS_CHARGING)
 		is_batt_charging = true;
 
-	rc = power_supply_get_property(batt_psy,
-				       POWER_SUPPLY_PROP_CURRENT_NOW, &pval);
+	rc = fg_get_battery_current(chip, &chg_current);
 	if (rc < 0) {
 		pr_warn("failed to get POWER_SUPPLY_PROP_CURRENT_NOW rc = %d\n",
 			rc);
 		return temp;
 	}
-
-	chg_current = pval.intval;
 
 	 /* sample charging current */
 	if (is_batt_charging)
@@ -2562,9 +2561,7 @@ static void clear_cycle_counter(struct fg_chip *chip)
 		chip->cyc_ctr.last_soc[i] = 0;
 	}
 	rc = fg_sram_write(chip, CYCLE_COUNT_WORD, CYCLE_COUNT_OFFSET,
-			(u8 *)&chip->cyc_ctr.count,
-			sizeof(chip->cyc_ctr.count) / sizeof(u8 *),
-			FG_IMA_DEFAULT);
+			(u8 *)&chip->cyc_ctr.count, sizeof(chip->cyc_ctr.count), FG_IMA_DEFAULT);
 	if (rc < 0)
 		pr_err("failed to clear cycle counter rc=%d\n", rc);
 
